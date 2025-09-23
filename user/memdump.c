@@ -60,6 +60,50 @@ main(int argc, char *argv[])
 void
 memdump(char *fmt, char *data)
 {
-  // Your code here.
+  char *p = data;
+
+    for(; *fmt; fmt++){
+        switch(*fmt){
+        case 'i': { // 32-bit int
+            int val = *(int*)p;
+            printf("%d\n", val);
+            p += 4;
+            break;
+        }
+        case 'p': { // 64-bit pointer/integer in hex
+            uint64 val = *(uint64*)p;
+            printf("%lx\n", val);
+            p += 8;
+            break;
+        }
+        case 'h': { // 16-bit int
+            short val = *(short*)p;
+            printf("%d\n", val);
+            p += 2;
+            break;
+        }
+        case 'c': { // 8-bit ASCII char
+            char val = *p;
+            printf("%c\n", val);
+            p += 1;
+            break;
+        }
+        case 's': { // pointer to C string (8-byte pointer)
+            char *str = *(char**)p;
+            printf("%s\n", str);
+            p += 8;
+            break;
+        }
+        case 'S': { // inline null-terminated C string
+            char *str = p;
+            printf("%s\n", str);
+            p += strlen(str) + 1;  // skip over the string
+            break;
+        }
+        default:
+            // ignore unknown format characters
+            break;
+        }
+    }
 
 }
