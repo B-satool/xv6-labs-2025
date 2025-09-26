@@ -3,13 +3,71 @@
 #include "user/user.h"
 #include "kernel/fs.h"
 
-char *exec_args[32]; // arguments for -exec
+char *exec_args[32];
 int exec_argc = 0;
 int do_exec = 0;
+char *target;       
 
-void
-rfind(char *path, char *target)
-{
+// --------- Simple regex matcher  ---------
+int matchhere(char *re, char *text);
+int matchstar(int c, char *re, char *text);
+
+int match(char *re, char *text) {
+    if(re[0] == '^')
+        return matchhere(re+1, text);
+    do {  
+        if(matchhere(re, text))
+            return 1;
+    } while(*text++ != '\0');
+    return 0;
+}
+
+int matchhere(char *re, char *text) {
+    if(re[0] == '\0')
+        return 1;
+    if(re[1] == '*')
+        return matchstar(re[0], re+2, text);
+    if(re[0] == '$' && re[1] == '\0')
+        return *text == '\0';
+    if(*text!='\0' && (re[0]=='.' || re[0]==*text))
+        return matchhere(re+1, text+1);
+    return 0;
+}
+
+int matchstar(int c, char *re, char *text) {
+    do {  
+        if(matchhere(re, text))
+            return 1;
+    } while(*text!='\0' && (*text++==c || c=='.'));
+    return 0;
+}
+
+// --------- run exec command if requested ---------
+void run_exec(char *path) {
+    // special case: echo
+    if(strcmp(exec_args[0], "echo") == 0){
+        printf("%s\n", path);
+        return;
+    }
+
+    char *argv[32];
+    int i;
+    for(i = 0; i < exec_argc; i++)
+        argv[i] = exec_args[i];
+    argv[i++] = path;
+    argv[i] = 0;
+
+    if(fork() == 0){
+        exec(argv[0], argv);
+        fprintf(2, "exec %s failed\n", argv[0]);
+        exit(1);
+    } else {
+        wait(0);
+    }
+}
+
+// --------- recursive find ---------
+void rfind(char *path) {
     char buf[512], *p;
     int fd;
     struct dirent de;
@@ -35,23 +93,9 @@ rfind(char *path, char *target)
             p--;
         p++;
 
-        if(strcmp(p, target) == 0){
+        if(match(target, p)){
             if(do_exec){
-                // build argv list: exec_args + filename
-                char *argv[32];
-                int i;
-                for(i = 0; i < exec_argc; i++)
-                    argv[i] = exec_args[i];
-                argv[i++] = path;
-                argv[i] = 0;
-
-                if(fork() == 0){
-                    exec(argv[0], argv);
-                    fprintf(2, "exec %s failed\n", argv[0]);
-                    exit(1);
-                } else {
-                    wait(0);
-                }
+                run_exec(path);
             } else {
                 printf("%s\n", path);
             }
@@ -73,6 +117,7 @@ rfind(char *path, char *target)
                 continue;
             if(strcmp(de.name, ".") == 0 || strcmp(de.name, "..") == 0)
                 continue;
+
             memmove(p, de.name, DIRSIZ);
             p[DIRSIZ] = 0;
 
@@ -81,24 +126,11 @@ rfind(char *path, char *target)
                 continue;
             }
             if(st.type == T_DIR){
-                rfind(buf, target);
+                rfind(buf);
             } else {
-                if(strcmp(de.name, target) == 0){
+                if (match(target, p)) {
                     if(do_exec){
-                        char *argv[32];
-                        int i;
-                        for(i = 0; i < exec_argc; i++)
-                            argv[i] = exec_args[i];
-                        argv[i++] = buf;
-                        argv[i] = 0;
-
-                        if(fork() == 0){
-                            exec(argv[0], argv);
-                            fprintf(2, "exec %s failed\n", argv[0]);
-                            exit(1);
-                        } else {
-                            wait(0);
-                        }
+                        run_exec(buf);
                     } else {
                         printf("%s\n", buf);
                     }
@@ -110,27 +142,31 @@ rfind(char *path, char *target)
     close(fd);
 }
 
-int
-main(int argc, char *argv[])
-{
+// --------- main ---------
+int main(int argc, char *argv[]) {
     if(argc < 3){
-        fprintf(2, "Usage: find <path> <filename> [-exec cmd ...]\n");
+        fprintf(2, "Usage: find <path> <regex> [-exec cmd ...]\n");
         exit(1);
     }
+
+    target = argv[2];
 
     // detect -exec
     for(int i = 3; i < argc; i++){
         if(strcmp(argv[i], "-exec") == 0){
             do_exec = 1;
-            exec_argc = argc - (i + 1);
-            for(int j = 0; j < exec_argc; j++){
-                exec_args[j] = argv[i + 1 + j];
+            exec_argc = 0;
+            for(int j = i+1; j < argc; j++){
+                if(strcmp(argv[j], ";") == 0 || strcmp(argv[j], "\\;") == 0){
+                    break;
+                }
+                exec_args[exec_argc++] = argv[j];
             }
             break;
         }
     }
 
-    rfind(argv[1], argv[2]);
+    rfind(argv[1]);
     exit(0);
 }
 
