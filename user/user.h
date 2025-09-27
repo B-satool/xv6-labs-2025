@@ -1,5 +1,8 @@
 #define SBRK_ERROR ((char *)-1)
 
+int strncmp(const char*, const char*, uint);
+
+
 struct stat;
 
 // system calls

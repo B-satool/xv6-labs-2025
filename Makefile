@@ -144,6 +144,7 @@ tags: $(OBJS)
 	etags kernel/*.S kernel/*.c
 
 ULIB = $U/ulib.o $U/usys.o $U/printf.o $U/umalloc.o
+# ULIB = user/ulib.o user/usys.o user/printf.o user/umalloc.o user/string.o
 
 ifeq ($(LAB),lock)
 ULIB += $U/statistics.o
