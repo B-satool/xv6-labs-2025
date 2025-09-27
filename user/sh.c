@@ -158,7 +158,7 @@ main(void)
     }
   }
 
-   // Read and run input commands.
+  // Read and run input commands.
   while(getcmd(buf, sizeof(buf)) >= 0){
     char *cmd = buf;
 
@@ -181,15 +181,20 @@ main(void)
         fprintf(2, "no child to wait for\n");
 
     } else {
+      struct cmd *c = parsecmd(cmd);
       if(fork1() == 0)
-        runcmd(parsecmd(cmd));
-      wait(0);
+        runcmd(c);
+
+      // Only wait if this is NOT a background command
+      if(c->type != BACK)
+        wait(0);
     }
   }
+
   exit(0);
-
-
 }
+
+
 
 void
 panic(char *s)
